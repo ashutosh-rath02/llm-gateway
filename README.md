@@ -10,9 +10,11 @@ This repository currently includes:
 - request trace middleware
 - health endpoint
 - `POST /v1/llm/execute` endpoint with mock and OpenAI-compatible provider paths
+- `GET /v1/traces/{trace_id}` endpoint for trace inspection
+- `GET /v1/metrics/cost` endpoint for cost rollups
 - configuration system
 - trace persistence models and Alembic migration
-- Docker Compose for Postgres and Redis
+- Docker Compose for Postgres
 - starter tests
 
 ## Quick Start
@@ -41,3 +43,5 @@ To exercise the live OpenAI path:
 - `GET /healthz`
 - `GET /v1/meta`
 - `POST /v1/llm/execute`
+- `GET /v1/traces/{trace_id}`
+- `GET /v1/metrics/cost`

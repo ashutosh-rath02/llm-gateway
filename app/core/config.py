@@ -12,7 +12,6 @@ class Settings(BaseSettings):
     default_model: str = "mock-fast-small"
     openai_default_model: str = "gpt-5.4-mini"
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5433/llm_gateway"
-    redis_url: str = "redis://localhost:6379/0"
     provider_timeout_ms: int = 15000
     openai_base_url: str = "https://api.openai.com/v1"
     openai_api_key: str = ""

@@ -9,6 +9,8 @@
 - Trace persistence service with trace and model-call records
 - Initial Alembic migration for persisted trace tables
 - Provider parser tests and trace persistence tests
+- Trace detail endpoint at `GET /v1/traces/{trace_id}`
+- Cost metrics endpoint at `GET /v1/metrics/cost`
 
 ### Changed
 
@@ -18,6 +20,7 @@
 - The bundled Postgres dev port now defaults to `5433` to avoid collisions with local Postgres services
 - Outbound OpenAI structured-output schemas are normalized to satisfy strict-mode requirements such as `additionalProperties: false`
 - Trace persistence now flushes parent trace rows before model-call inserts, fixing foreign-key write failures discovered in live testing
+- Unused Redis and worker-placeholder scaffold code was removed until background processing is actually introduced
 
 ## 0.1.0 - 2026-05-13
 
