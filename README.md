@@ -9,9 +9,9 @@ This repository currently includes:
 - FastAPI service scaffold
 - request trace middleware
 - health endpoint
-- mocked `POST /v1/llm/execute` endpoint
+- `POST /v1/llm/execute` endpoint with mock and OpenAI-compatible provider paths
 - configuration system
-- SQLAlchemy and Alembic scaffolding
+- trace persistence models and Alembic migration
 - Docker Compose for Postgres and Redis
 - starter tests
 
@@ -20,12 +20,24 @@ This repository currently includes:
 1. Create a virtual environment and install dependencies from `pyproject.toml`.
 2. Copy `.env.example` to `.env`.
 3. Start local infra with `docker-compose up -d`.
-4. Run the API with `uvicorn app.main:app --reload`.
-5. Run tests with `pytest`.
+4. Run database migrations with `alembic upgrade head`.
+5. Run the API with `uvicorn app.main:app --reload`.
+6. Run tests with `pytest`.
+
+The bundled Postgres container is exposed on `localhost:5433` to avoid clashing with local Postgres installs that commonly use `5432`.
+
+## OpenAI Provider
+
+The gateway keeps `mock` as the default provider so the project stays runnable without external API access.
+
+To exercise the live OpenAI path:
+
+1. Set `OPENAI_API_KEY` in `.env`.
+2. Either set `DEFAULT_PROVIDER=openai_compatible` or send `"provider": "openai_compatible"` in the request body.
+3. Optionally set `OPENAI_DEFAULT_MODEL` to the model you want to use.
 
 ## API Endpoints
 
 - `GET /healthz`
 - `GET /v1/meta`
 - `POST /v1/llm/execute`
-

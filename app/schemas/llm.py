@@ -39,6 +39,7 @@ class GatewayExecuteRequest(BaseModel):
     input: str = Field(min_length=1)
     context: list[ContextItem] = Field(default_factory=list)
     schema_: dict[str, Any] | None = Field(default=None, alias="schema")
+    provider: Literal["mock", "openai_compatible"] | None = None
     routing_policy: Literal[
         "cost_optimized",
         "balanced",

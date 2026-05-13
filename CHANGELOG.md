@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- OpenAI-compatible provider implementation using the Responses API
+- Optional request-level provider override for testing `mock` and `openai_compatible`
+- Trace persistence service with trace and model-call records
+- Initial Alembic migration for persisted trace tables
+- Provider parser tests and trace persistence tests
+
+### Changed
+
+- Cost calculation now uses model-specific pricing metadata for known models
+- Test setup now uses an isolated SQLite database so persistence is exercised in CI-friendly runs
+- README now documents migrations and live OpenAI provider testing
+- The bundled Postgres dev port now defaults to `5433` to avoid collisions with local Postgres services
+- Outbound OpenAI structured-output schemas are normalized to satisfy strict-mode requirements such as `additionalProperties: false`
+- Trace persistence now flushes parent trace rows before model-call inserts, fixing foreign-key write failures discovered in live testing
+
 ## 0.1.0 - 2026-05-13
 
 Initial scaffold for the LLM Gateway MVP.

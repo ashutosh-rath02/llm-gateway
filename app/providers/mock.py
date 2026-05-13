@@ -13,6 +13,7 @@ class MockProvider(LLMProvider):
         output_tokens = max(1, len(str(output).split()))
 
         return ProviderResponse(
+            provider="mock",
             model=request.requested_model or self.default_model,
             output=output,
             input_tokens=input_tokens,
@@ -57,4 +58,3 @@ class MockProvider(LLMProvider):
         if schema_type == "object":
             return {}
         return None
-

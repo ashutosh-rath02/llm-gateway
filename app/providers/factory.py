@@ -5,16 +5,18 @@ from app.providers.openai_compatible import OpenAICompatibleProvider
 
 
 class ProviderFactory:
-    def __init__(self) -> None:
-        self.settings = get_settings()
-
     def get_provider(self, provider_name: str | None = None) -> LLMProvider:
-        name = provider_name or self.settings.default_provider
+        settings = get_settings()
+        name = provider_name or settings.default_provider
 
         if name == "mock":
-            return MockProvider(default_model=self.settings.default_model)
+            return MockProvider(default_model=settings.default_model)
         if name == "openai_compatible":
-            return OpenAICompatibleProvider(default_model=self.settings.default_model)
+            return OpenAICompatibleProvider(
+                api_key=settings.openai_api_key,
+                base_url=settings.openai_base_url,
+                default_model=settings.openai_default_model,
+                timeout_ms=settings.provider_timeout_ms,
+            )
 
         raise ValueError(f"Unsupported provider '{name}'.")
-

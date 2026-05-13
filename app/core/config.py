@@ -10,7 +10,8 @@ class Settings(BaseSettings):
     api_prefix: str = "/v1"
     default_provider: str = "mock"
     default_model: str = "mock-fast-small"
-    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/llm_gateway"
+    openai_default_model: str = "gpt-5.4-mini"
+    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5433/llm_gateway"
     redis_url: str = "redis://localhost:6379/0"
     provider_timeout_ms: int = 15000
     openai_base_url: str = "https://api.openai.com/v1"
@@ -18,6 +19,7 @@ class Settings(BaseSettings):
     store_prompts: bool = False
     store_outputs: bool = False
     hash_user_ids: bool = True
+    trace_persistence_enabled: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -29,4 +31,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
