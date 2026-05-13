@@ -15,13 +15,15 @@
 - Cost metrics endpoint at `GET /v1/metrics/cost`
 - Prompt template name/version tracking on execute requests and persisted traces
 - Same-model repair retry for structured-output validation failures
+- Reliability metrics endpoint at `GET /v1/metrics/reliability`
 
 ### Changed
 
 - Cost calculation now uses model-specific pricing metadata for known models
 - Trace model-call records now label attempts as `primary`, `repair`, or `fallback`
+- Cost metrics filters now also support prompt template name/version, and README flowcharts now cover reliability rollups
 - Test setup now uses an isolated SQLite database so persistence is exercised in CI-friendly runs
-- README now includes living Mermaid flowcharts for request execution, repair, and trace persistence alongside the setup docs
+- README now includes living Mermaid flowcharts for request execution, repair, trace persistence, and reliability metrics
 - The bundled Postgres dev port now defaults to `5433` to avoid collisions with local Postgres services
 - Outbound OpenAI structured-output schemas are normalized to satisfy strict-mode requirements such as `additionalProperties: false`
 - Trace persistence now flushes parent trace rows before model-call inserts, fixing foreign-key write failures discovered in live testing

@@ -61,3 +61,42 @@ class CostMetricsResponse(BaseModel):
     by_feature: list[CostBreakdownItem]
     by_model: list[CostBreakdownItem]
     by_tenant: list[CostBreakdownItem]
+
+
+class ReliabilityBreakdownItem(BaseModel):
+    key: str
+    request_count: int
+    success_count: int
+    validation_failed_count: int
+    provider_error_count: int
+    fallback_count: int
+    repair_attempted_count: int
+    repair_recovered_count: int
+    success_rate: float
+    validation_failure_rate: float
+    provider_error_rate: float
+    fallback_rate: float
+    repair_attempt_rate: float
+    repair_recovery_rate: float
+    avg_attempt_count: float
+
+
+class ReliabilityMetricsResponse(BaseModel):
+    request_count: int
+    success_count: int
+    validation_failed_count: int
+    provider_error_count: int
+    fallback_count: int
+    repair_attempted_count: int
+    repair_recovered_count: int
+    success_rate: float
+    validation_failure_rate: float
+    provider_error_rate: float
+    fallback_rate: float
+    repair_attempt_rate: float
+    repair_recovery_rate: float
+    avg_attempt_count: float
+    by_feature: list[ReliabilityBreakdownItem]
+    by_model: list[ReliabilityBreakdownItem]
+    by_tenant: list[ReliabilityBreakdownItem]
+    by_prompt_template: list[ReliabilityBreakdownItem]

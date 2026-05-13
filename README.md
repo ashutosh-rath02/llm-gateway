@@ -17,6 +17,7 @@ This repository currently includes:
 - fallback to stronger models when provider errors or repair attempts still fail within budget
 - `GET /v1/traces/{trace_id}` endpoint for trace inspection
 - `GET /v1/metrics/cost` endpoint for cost rollups
+- `GET /v1/metrics/reliability` endpoint for success, failure, repair, and fallback rollups
 - configuration system
 - trace persistence models and Alembic migration
 - Docker Compose for Postgres
@@ -67,6 +68,17 @@ Current fallback behavior:
 - `prompt_template_version`
 
 Those values are persisted on the top-level trace so you can tie outcomes, cost, and reliability back to the exact prompt contract that produced them. Repair attempts are also marked in trace detail as `attempt_kind = "repair"`.
+
+## Reliability Metrics
+
+`GET /v1/metrics/reliability` rolls up persisted traces into gateway health signals:
+
+- success vs `validation_failed` vs `provider_error`
+- fallback usage rate
+- repair attempt rate
+- repair recovery rate
+- average attempts per request
+- breakdowns by feature, model, tenant, and prompt template version
 
 ## Flowcharts
 
@@ -126,7 +138,19 @@ flowchart TD
     D --> E[Usage, latency, and cost aggregated]
     E --> F[Trace record persisted with prompt template metadata]
     F --> G[Trace detail API exposes full execution history]
-    G --> H[Cost metrics API rolls up persisted trace records]
+    G --> H[Cost and reliability metrics APIs roll up persisted trace records]
+```
+
+### Reliability Metrics Flow
+
+```mermaid
+flowchart TD
+    A[Persisted trace records] --> B[Load matching traces by filters]
+    B --> C[Load related model-call attempts]
+    C --> D[Compute request-level repair and fallback signals]
+    D --> E[Aggregate overall gateway reliability]
+    E --> F[Group by feature, model, tenant, and prompt template]
+    F --> G[Serve GET /v1/metrics/reliability]
 ```
 
 ## API Endpoints
@@ -136,3 +160,4 @@ flowchart TD
 - `POST /v1/llm/execute`
 - `GET /v1/traces/{trace_id}`
 - `GET /v1/metrics/cost`
+- `GET /v1/metrics/reliability`

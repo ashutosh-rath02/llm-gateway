@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
@@ -14,6 +15,8 @@ from app.schemas.llm import GatewayExecuteRequest, GatewayExecuteResponse
 from app.schemas.trace import (
     CostBreakdownItem,
     CostMetricsResponse,
+    ReliabilityBreakdownItem,
+    ReliabilityMetricsResponse,
     TraceDetailResponse,
     TraceModelCallResponse,
 )
@@ -34,6 +37,38 @@ class PersistedModelCall:
     cached_input_tokens: int
     latency_ms: int
     cost_usd: float
+
+
+@dataclass(slots=True)
+class ReliabilityAccumulator:
+    request_count: int = 0
+    success_count: int = 0
+    validation_failed_count: int = 0
+    provider_error_count: int = 0
+    fallback_count: int = 0
+    repair_attempted_count: int = 0
+    repair_recovered_count: int = 0
+    total_attempt_count: int = 0
+
+    def add(self, trace_record: TraceRecord, model_calls: list[ModelCallRecord]) -> None:
+        self.request_count += 1
+        self.total_attempt_count += len(model_calls)
+
+        if trace_record.status == "success":
+            self.success_count += 1
+        elif trace_record.status == "validation_failed":
+            self.validation_failed_count += 1
+        elif trace_record.status == "provider_error":
+            self.provider_error_count += 1
+
+        if trace_record.fallback_used:
+            self.fallback_count += 1
+
+        repair_attempted = any(call.attempt_kind == "repair" for call in model_calls)
+        if repair_attempted:
+            self.repair_attempted_count += 1
+            if trace_record.status == "success" and not trace_record.fallback_used:
+                self.repair_recovered_count += 1
 
 
 class TraceRepository:
@@ -230,22 +265,18 @@ class TraceRepository:
         feature: str | None = None,
         model: str | None = None,
         tenant_id: str | None = None,
+        prompt_template_name: str | None = None,
+        prompt_template_version: str | None = None,
     ) -> CostMetricsResponse:
         with session_scope() as session:
-            filters = []
-            if feature is not None:
-                filters.append(TraceRecord.feature == feature)
-            if model is not None:
-                filters.append(TraceRecord.model == model)
-            if tenant_id is not None:
-                filters.append(TraceRecord.tenant_id == tenant_id)
-
-            base_query = select(TraceRecord)
-            if filters:
-                for condition in filters:
-                    base_query = base_query.where(condition)
-
-            traces = session.scalars(base_query).all()
+            filters = self._build_trace_filters(
+                feature=feature,
+                model=model,
+                tenant_id=tenant_id,
+                prompt_template_name=prompt_template_name,
+                prompt_template_version=prompt_template_version,
+            )
+            traces = session.scalars(self._build_trace_query(filters)).all()
 
             by_feature = self._group_cost_breakdown(session, "feature", filters)
             by_model = self._group_cost_breakdown(session, "model", filters)
@@ -266,6 +297,76 @@ class TraceRepository:
             by_feature=by_feature,
             by_model=by_model,
             by_tenant=by_tenant,
+        )
+
+    def get_reliability_metrics(
+        self,
+        *,
+        feature: str | None = None,
+        model: str | None = None,
+        tenant_id: str | None = None,
+        prompt_template_name: str | None = None,
+        prompt_template_version: str | None = None,
+    ) -> ReliabilityMetricsResponse:
+        with session_scope() as session:
+            filters = self._build_trace_filters(
+                feature=feature,
+                model=model,
+                tenant_id=tenant_id,
+                prompt_template_name=prompt_template_name,
+                prompt_template_version=prompt_template_version,
+            )
+            traces = session.scalars(self._build_trace_query(filters)).all()
+            model_calls_by_trace = self._load_model_calls_by_trace(session, traces)
+
+        overall = self._build_reliability_accumulator(traces, model_calls_by_trace)
+        return ReliabilityMetricsResponse(
+            request_count=overall.request_count,
+            success_count=overall.success_count,
+            validation_failed_count=overall.validation_failed_count,
+            provider_error_count=overall.provider_error_count,
+            fallback_count=overall.fallback_count,
+            repair_attempted_count=overall.repair_attempted_count,
+            repair_recovered_count=overall.repair_recovered_count,
+            success_rate=self._rate(overall.success_count, overall.request_count),
+            validation_failure_rate=self._rate(
+                overall.validation_failed_count,
+                overall.request_count,
+            ),
+            provider_error_rate=self._rate(
+                overall.provider_error_count,
+                overall.request_count,
+            ),
+            fallback_rate=self._rate(overall.fallback_count, overall.request_count),
+            repair_attempt_rate=self._rate(
+                overall.repair_attempted_count,
+                overall.request_count,
+            ),
+            repair_recovery_rate=self._rate(
+                overall.repair_recovered_count,
+                overall.repair_attempted_count,
+            ),
+            avg_attempt_count=self._average_attempt_count(overall),
+            by_feature=self._build_reliability_breakdown(
+                traces,
+                model_calls_by_trace,
+                key_fn=lambda trace: trace.feature,
+            ),
+            by_model=self._build_reliability_breakdown(
+                traces,
+                model_calls_by_trace,
+                key_fn=lambda trace: trace.model or "unknown",
+            ),
+            by_tenant=self._build_reliability_breakdown(
+                traces,
+                model_calls_by_trace,
+                key_fn=lambda trace: trace.tenant_id or "unknown",
+            ),
+            by_prompt_template=self._build_reliability_breakdown(
+                traces,
+                model_calls_by_trace,
+                key_fn=self._prompt_template_key,
+            ),
         )
 
     def _sanitize_metadata(
@@ -347,6 +448,143 @@ class TraceRepository:
             )
             for row in rows
         ]
+
+    def _build_trace_filters(
+        self,
+        *,
+        feature: str | None,
+        model: str | None,
+        tenant_id: str | None,
+        prompt_template_name: str | None,
+        prompt_template_version: str | None,
+    ) -> list:
+        filters = []
+        if feature is not None:
+            filters.append(TraceRecord.feature == feature)
+        if model is not None:
+            filters.append(TraceRecord.model == model)
+        if tenant_id is not None:
+            filters.append(TraceRecord.tenant_id == tenant_id)
+        if prompt_template_name is not None:
+            filters.append(TraceRecord.prompt_template_name == prompt_template_name)
+        if prompt_template_version is not None:
+            filters.append(TraceRecord.prompt_template_version == prompt_template_version)
+        return filters
+
+    def _build_trace_query(self, filters: list):
+        query = select(TraceRecord)
+        for condition in filters:
+            query = query.where(condition)
+        return query
+
+    def _load_model_calls_by_trace(
+        self,
+        session,
+        traces: list[TraceRecord],
+    ) -> dict[str, list[ModelCallRecord]]:
+        trace_ids = [trace.trace_id for trace in traces]
+        if not trace_ids:
+            return {}
+
+        model_calls = session.scalars(
+            select(ModelCallRecord)
+            .where(ModelCallRecord.trace_id.in_(trace_ids))
+            .order_by(ModelCallRecord.attempt.asc(), ModelCallRecord.created_at.asc())
+        ).all()
+        grouped: dict[str, list[ModelCallRecord]] = defaultdict(list)
+        for call in model_calls:
+            grouped[call.trace_id].append(call)
+        return dict(grouped)
+
+    def _build_reliability_accumulator(
+        self,
+        traces: list[TraceRecord],
+        model_calls_by_trace: dict[str, list[ModelCallRecord]],
+    ) -> ReliabilityAccumulator:
+        accumulator = ReliabilityAccumulator()
+        for trace in traces:
+            accumulator.add(trace, model_calls_by_trace.get(trace.trace_id, []))
+        return accumulator
+
+    def _build_reliability_breakdown(
+        self,
+        traces: list[TraceRecord],
+        model_calls_by_trace: dict[str, list[ModelCallRecord]],
+        *,
+        key_fn,
+    ) -> list[ReliabilityBreakdownItem]:
+        grouped: dict[str, ReliabilityAccumulator] = {}
+        for trace in traces:
+            key = key_fn(trace)
+            accumulator = grouped.setdefault(key, ReliabilityAccumulator())
+            accumulator.add(trace, model_calls_by_trace.get(trace.trace_id, []))
+
+        return [
+            self._to_reliability_breakdown_item(key, accumulator)
+            for key, accumulator in sorted(
+                grouped.items(),
+                key=lambda item: (-item[1].request_count, item[0]),
+            )
+        ]
+
+    def _to_reliability_breakdown_item(
+        self,
+        key: str,
+        accumulator: ReliabilityAccumulator,
+    ) -> ReliabilityBreakdownItem:
+        return ReliabilityBreakdownItem(
+            key=key,
+            request_count=accumulator.request_count,
+            success_count=accumulator.success_count,
+            validation_failed_count=accumulator.validation_failed_count,
+            provider_error_count=accumulator.provider_error_count,
+            fallback_count=accumulator.fallback_count,
+            repair_attempted_count=accumulator.repair_attempted_count,
+            repair_recovered_count=accumulator.repair_recovered_count,
+            success_rate=self._rate(accumulator.success_count, accumulator.request_count),
+            validation_failure_rate=self._rate(
+                accumulator.validation_failed_count,
+                accumulator.request_count,
+            ),
+            provider_error_rate=self._rate(
+                accumulator.provider_error_count,
+                accumulator.request_count,
+            ),
+            fallback_rate=self._rate(
+                accumulator.fallback_count,
+                accumulator.request_count,
+            ),
+            repair_attempt_rate=self._rate(
+                accumulator.repair_attempted_count,
+                accumulator.request_count,
+            ),
+            repair_recovery_rate=self._rate(
+                accumulator.repair_recovered_count,
+                accumulator.repair_attempted_count,
+            ),
+            avg_attempt_count=self._average_attempt_count(accumulator),
+        )
+
+    def _prompt_template_key(self, trace_record: TraceRecord) -> str:
+        name = trace_record.prompt_template_name
+        version = trace_record.prompt_template_version
+        if name and version:
+            return f"{name}@{version}"
+        if name:
+            return name
+        if version:
+            return version
+        return "unknown"
+
+    def _rate(self, numerator: int, denominator: int) -> float:
+        if denominator == 0:
+            return 0.0
+        return round(numerator / denominator, 4)
+
+    def _average_attempt_count(self, accumulator: ReliabilityAccumulator) -> float:
+        if accumulator.request_count == 0:
+            return 0.0
+        return round(accumulator.total_attempt_count / accumulator.request_count, 2)
 
     def _build_validation_summary(self, record) -> Any:
         if record.schema_valid is None and record.business_rules_valid is None:
