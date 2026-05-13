@@ -7,6 +7,7 @@ from app.schemas.llm import FallbackSummary, UsageSummary, ValidationSummary
 
 class TraceModelCallResponse(BaseModel):
     attempt: int
+    attempt_kind: str
     provider: str
     model: str
     status: str
@@ -27,6 +28,8 @@ class TraceDetailResponse(BaseModel):
     provider: str | None = None
     model: str | None = None
     error_type: str | None = None
+    prompt_template_name: str | None = None
+    prompt_template_version: str | None = None
     tenant_id: str | None = None
     user_id_hash: str | None = None
     request_metadata: dict | None = None

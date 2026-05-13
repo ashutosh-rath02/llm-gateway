@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     provider_timeout_ms: int = 15000
     openai_base_url: str = "https://api.openai.com/v1"
     openai_api_key: str = ""
+    repair_retry_enabled: bool = True
+    max_repair_attempts_per_model: int = 1
+    repair_prompt_version: str = "repair_v1"
     store_prompts: bool = False
     store_outputs: bool = False
     hash_user_ids: bool = True

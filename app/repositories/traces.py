@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True, slots=True)
 class PersistedModelCall:
     attempt: int
+    attempt_kind: str
     provider: str
     model: str
     status: str
@@ -67,6 +68,8 @@ class TraceRepository:
             provider=provider_name,
             model=response.model,
             error_type=None,
+            prompt_template_name=payload.prompt_template_name,
+            prompt_template_version=payload.prompt_template_version,
             tenant_id=tenant_id,
             user_id_hash=user_id_hash,
             request_metadata=metadata,
@@ -84,23 +87,7 @@ class TraceRepository:
             fallback_used=response.fallback.used,
             fallback_level=response.fallback.level,
         )
-        call_records = [
-            ModelCallRecord(
-                trace_id=trace_id,
-                attempt=call.attempt,
-                provider=call.provider,
-                model=call.model,
-                status=call.status,
-                error_type=call.error_type,
-                input_tokens=call.input_tokens,
-                output_tokens=call.output_tokens,
-                cached_input_tokens=call.cached_input_tokens,
-                latency_ms=call.latency_ms,
-                cost_usd=call.cost_usd,
-            )
-            for call in model_calls
-        ]
-        self._persist(trace_record, call_records)
+        self._persist(trace_record, self._build_call_records(trace_id, model_calls))
 
     def record_failure(
         self,
@@ -135,6 +122,8 @@ class TraceRepository:
             provider=provider_name,
             model=model_name,
             error_type=error_type,
+            prompt_template_name=payload.prompt_template_name,
+            prompt_template_version=payload.prompt_template_version,
             tenant_id=tenant_id,
             user_id_hash=user_id_hash,
             request_metadata=metadata,
@@ -150,23 +139,7 @@ class TraceRepository:
             fallback_used=fallback_level > 0,
             fallback_level=fallback_level,
         )
-        call_records = [
-            ModelCallRecord(
-                trace_id=trace_id,
-                attempt=call.attempt,
-                provider=call.provider,
-                model=call.model,
-                status=call.status,
-                error_type=call.error_type,
-                input_tokens=call.input_tokens,
-                output_tokens=call.output_tokens,
-                cached_input_tokens=call.cached_input_tokens,
-                latency_ms=call.latency_ms,
-                cost_usd=call.cost_usd,
-            )
-            for call in model_calls
-        ]
-        self._persist(trace_record, call_records)
+        self._persist(trace_record, self._build_call_records(trace_id, model_calls))
 
     def _persist(self, trace_record: TraceRecord, call_records: list[ModelCallRecord]) -> None:
         try:
@@ -200,6 +173,8 @@ class TraceRepository:
             provider=trace_record.provider,
             model=trace_record.model,
             error_type=trace_record.error_type,
+            prompt_template_name=trace_record.prompt_template_name,
+            prompt_template_version=trace_record.prompt_template_version,
             tenant_id=trace_record.tenant_id,
             user_id_hash=trace_record.user_id_hash,
             request_metadata=trace_record.request_metadata,
@@ -213,6 +188,7 @@ class TraceRepository:
             model_calls=[
                 TraceModelCallResponse(
                     attempt=call.attempt,
+                    attempt_kind=call.attempt_kind,
                     provider=call.provider,
                     model=call.model,
                     status=call.status,
@@ -224,6 +200,29 @@ class TraceRepository:
                 for call in model_calls
             ],
         )
+
+    def _build_call_records(
+        self,
+        trace_id: str,
+        model_calls: list[PersistedModelCall],
+    ) -> list[ModelCallRecord]:
+        return [
+            ModelCallRecord(
+                trace_id=trace_id,
+                attempt=call.attempt,
+                attempt_kind=call.attempt_kind,
+                provider=call.provider,
+                model=call.model,
+                status=call.status,
+                error_type=call.error_type,
+                input_tokens=call.input_tokens,
+                output_tokens=call.output_tokens,
+                cached_input_tokens=call.cached_input_tokens,
+                latency_ms=call.latency_ms,
+                cost_usd=call.cost_usd,
+            )
+            for call in model_calls
+        ]
 
     def get_cost_metrics(
         self,

@@ -57,6 +57,8 @@ def test_execute_persists_trace_and_model_call_records(client: TestClient) -> No
             "feature": "support_triage",
             "task_type": "faq",
             "input": "How do I reset my device Wi-Fi?",
+            "prompt_template_name": "support_triage_v1",
+            "prompt_template_version": "2026-05-13",
             "metadata": {
                 "tenant_id": "tenant_123",
                 "user_id": "user_456",
@@ -80,7 +82,10 @@ def test_execute_persists_trace_and_model_call_records(client: TestClient) -> No
     assert trace_record is not None
     assert trace_record.feature == "support_triage"
     assert trace_record.provider == "mock"
+    assert trace_record.prompt_template_name == "support_triage_v1"
+    assert trace_record.prompt_template_version == "2026-05-13"
     assert trace_record.tenant_id == "tenant_123"
     assert trace_record.user_id_hash is not None
     assert len(model_calls) == 1
+    assert model_calls[0].attempt_kind == "primary"
     assert model_calls[0].status == "success"

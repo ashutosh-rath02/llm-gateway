@@ -8,6 +8,8 @@ def test_get_trace_returns_persisted_trace_details(client: TestClient) -> None:
             "feature": "support_triage",
             "task_type": "faq",
             "input": "How do I reset my device Wi-Fi?",
+            "prompt_template_name": "support_triage_v1",
+            "prompt_template_version": "2026-05-13",
             "metadata": {
                 "tenant_id": "tenant_123",
                 "user_id": "user_456",
@@ -23,10 +25,13 @@ def test_get_trace_returns_persisted_trace_details(client: TestClient) -> None:
     assert body["trace_id"] == trace_id
     assert body["feature"] == "support_triage"
     assert body["provider"] == "mock"
+    assert body["prompt_template_name"] == "support_triage_v1"
+    assert body["prompt_template_version"] == "2026-05-13"
     assert body["tenant_id"] == "tenant_123"
     assert body["user_id_hash"] is not None
     assert len(body["model_calls"]) == 1
     assert body["model_calls"][0]["provider"] == "mock"
+    assert body["model_calls"][0]["attempt_kind"] == "primary"
 
 
 def test_get_trace_returns_404_for_missing_trace(client: TestClient) -> None:

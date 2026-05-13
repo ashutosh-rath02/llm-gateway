@@ -72,12 +72,93 @@ def test_quality_optimized_routes_to_strongest_model(client: TestClient, monkeyp
     assert response.json()["model"] == "gpt-5.5"
 
 
-def test_validation_failure_falls_back_to_stronger_model(client: TestClient, monkeypatch) -> None:
+def test_validation_failure_repairs_on_same_model_before_fallback(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    captured_models: list[str] = []
+    captured_inputs: list[str] = []
+
     def fake_generate(self, request):
         from app.providers.base import ProviderResponse
 
-        if request.requested_model == "gpt-5-nano":
+        captured_models.append(request.requested_model)
+        captured_inputs.append(request.input_text)
+
+        if request.input_text.startswith("Repair the previous structured response"):
+            output = {
+                "intent": "wifi_reset",
+                "urgency": "high",
+                "required_action": "Escalate to technical support.",
+            }
+        elif request.requested_model == "gpt-5-nano":
             output = {"intent": "wifi_reset"}
+        else:
+            output = "unexpected_fallback"
+
+        return ProviderResponse(
+            provider="openai_compatible",
+            model=request.requested_model or "unknown",
+            output=output,
+            input_tokens=12,
+            output_tokens=8,
+            cached_input_tokens=0,
+        )
+
+    monkeypatch.setattr(
+        "app.providers.openai_compatible.OpenAICompatibleProvider.generate",
+        fake_generate,
+    )
+
+    response = client.post(
+        "/v1/llm/execute",
+        json={
+            "provider": "openai_compatible",
+            "feature": "support_triage",
+            "task_type": "structured_extraction",
+            "input": "Router disconnects every ten minutes.",
+            "routing_policy": "cost_optimized",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "intent": {"type": "string"},
+                    "urgency": {"type": "string"},
+                    "required_action": {"type": "string"},
+                },
+                "required": ["intent", "urgency", "required_action"],
+            },
+        },
+    )
+
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["status"] == "success"
+    assert body["fallback"]["used"] is False
+    assert body["fallback"]["level"] == 0
+    assert body["model"] == "gpt-5-nano"
+    assert captured_models == ["gpt-5-nano", "gpt-5-nano"]
+    assert captured_inputs[1].startswith("Repair the previous structured response")
+
+
+def test_validation_failure_falls_back_after_repair_attempt(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    captured_models: list[str] = []
+
+    def fake_generate(self, request):
+        from app.providers.base import ProviderResponse
+
+        captured_models.append(request.requested_model)
+        if request.requested_model == "gpt-5-nano":
+            if request.input_text.startswith("Repair the previous structured response"):
+                output = {
+                    "intent": "wifi_reset",
+                    "urgency": "high",
+                }
+            else:
+                output = {"intent": "wifi_reset"}
         else:
             output = {
                 "intent": "wifi_reset",
@@ -126,6 +207,7 @@ def test_validation_failure_falls_back_to_stronger_model(client: TestClient, mon
     assert body["fallback"]["used"] is True
     assert body["fallback"]["level"] == 1
     assert body["model"] == "gpt-5-mini"
+    assert captured_models == ["gpt-5-nano", "gpt-5-nano", "gpt-5-mini"]
 
 
 def test_provider_error_falls_back_to_stronger_model(client: TestClient, monkeypatch) -> None:

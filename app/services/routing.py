@@ -93,10 +93,13 @@ class RoutingService:
         decision: RoutingDecision,
         *,
         attempts: int,
+        fallback_level: int,
         final_status: str,
         final_error_type: str | None = None,
+        repair_attempts: int = 0,
+        repair_prompt_version: str | None = None,
     ) -> dict:
-        return {
+        metadata = {
             "routing": {
                 "policy": payload.routing_policy,
                 "provider": decision.provider_name,
@@ -108,11 +111,21 @@ class RoutingService:
             },
             "final": {
                 "attempt_count": attempts,
-                "fallback_used": attempts > 1,
+                "fallback_used": fallback_level > 0,
+                "fallback_level": fallback_level,
+                "repair_attempt_count": repair_attempts,
                 "final_status": final_status,
                 "final_error_type": final_error_type,
             },
         }
+        if repair_attempts > 0:
+            metadata["repair"] = {
+                "enabled": True,
+                "attempt_count": repair_attempts,
+                "template_name": "gateway_structured_output_repair",
+                "template_version": repair_prompt_version,
+            }
+        return metadata
 
     def _select_model(
         self,

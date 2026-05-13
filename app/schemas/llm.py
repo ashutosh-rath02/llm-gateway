@@ -50,6 +50,8 @@ class GatewayExecuteRequest(BaseModel):
     latency_budget_ms: int = Field(default=8000, gt=0)
     cost_budget_usd: float = Field(default=0.05, ge=0.0)
     requested_model: str | None = None
+    prompt_template_name: str | None = Field(default=None, min_length=1)
+    prompt_template_version: str | None = Field(default=None, min_length=1)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 

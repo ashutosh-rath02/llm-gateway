@@ -13,12 +13,15 @@
 - Provider parser tests and trace persistence tests
 - Trace detail endpoint at `GET /v1/traces/{trace_id}`
 - Cost metrics endpoint at `GET /v1/metrics/cost`
+- Prompt template name/version tracking on execute requests and persisted traces
+- Same-model repair retry for structured-output validation failures
 
 ### Changed
 
 - Cost calculation now uses model-specific pricing metadata for known models
+- Trace model-call records now label attempts as `primary`, `repair`, or `fallback`
 - Test setup now uses an isolated SQLite database so persistence is exercised in CI-friendly runs
-- README now documents migrations and live OpenAI provider testing
+- README now includes living Mermaid flowcharts for request execution, repair, and trace persistence alongside the setup docs
 - The bundled Postgres dev port now defaults to `5433` to avoid collisions with local Postgres services
 - Outbound OpenAI structured-output schemas are normalized to satisfy strict-mode requirements such as `additionalProperties: false`
 - Trace persistence now flushes parent trace rows before model-call inserts, fixing foreign-key write failures discovered in live testing
