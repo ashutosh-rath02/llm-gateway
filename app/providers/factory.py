@@ -20,3 +20,6 @@ class ProviderFactory:
             )
 
         raise ValueError(f"Unsupported provider '{name}'.")
+
+    def get_default_provider_name(self) -> str:
+        return get_settings().default_provider

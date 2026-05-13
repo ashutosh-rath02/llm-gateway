@@ -6,6 +6,8 @@
 
 - OpenAI-compatible provider implementation using the Responses API
 - Optional request-level provider override for testing `mock` and `openai_compatible`
+- Rule-based model routing for `cost_optimized`, `balanced`, `quality_optimized`, and explicit model selection
+- Fallback to stronger models when provider errors or validation failures occur within request budgets
 - Trace persistence service with trace and model-call records
 - Initial Alembic migration for persisted trace tables
 - Provider parser tests and trace persistence tests
@@ -21,6 +23,7 @@
 - Outbound OpenAI structured-output schemas are normalized to satisfy strict-mode requirements such as `additionalProperties: false`
 - Trace persistence now flushes parent trace rows before model-call inserts, fixing foreign-key write failures discovered in live testing
 - Unused Redis and worker-placeholder scaffold code was removed until background processing is actually introduced
+- Cost calculation now resolves dated OpenAI model IDs like `gpt-5.4-mini-2026-03-17` back to their pricing aliases
 
 ## 0.1.0 - 2026-05-13
 

@@ -10,6 +10,8 @@ This repository currently includes:
 - request trace middleware
 - health endpoint
 - `POST /v1/llm/execute` endpoint with mock and OpenAI-compatible provider paths
+- rule-based routing for `cost_optimized`, `balanced`, `quality_optimized`, and explicit model selection
+- fallback to stronger models when provider errors or structured-output validation failures occur within budget
 - `GET /v1/traces/{trace_id}` endpoint for trace inspection
 - `GET /v1/metrics/cost` endpoint for cost rollups
 - configuration system
@@ -37,6 +39,21 @@ To exercise the live OpenAI path:
 1. Set `OPENAI_API_KEY` in `.env`.
 2. Either set `DEFAULT_PROVIDER=openai_compatible` or send `"provider": "openai_compatible"` in the request body.
 3. Optionally set `OPENAI_DEFAULT_MODEL` to the model you want to use.
+
+## Routing and Fallback
+
+Current routing policies:
+
+- `cost_optimized`
+- `balanced`
+- `quality_optimized`
+- `explicit_model`
+
+Current fallback behavior:
+
+- If a provider call fails, the gateway can retry on a stronger eligible model.
+- If structured output fails schema validation, the gateway can retry on a stronger eligible model.
+- Fallback attempts stop when cost or latency budget would be exceeded.
 
 ## API Endpoints
 

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 
+from app.core.errors import GatewayError
 from app.providers.base import ProviderError
 from app.schemas.llm import GatewayExecuteRequest, GatewayExecuteResponse
 from app.services.execution import ExecutionService
@@ -16,7 +17,7 @@ def execute_llm_task(
     trace_id = getattr(request.state, "trace_id", None)
     try:
         return execution_service.execute(payload, trace_id=trace_id)
-    except ProviderError as exc:
+    except (ProviderError, GatewayError) as exc:
         raise HTTPException(
             status_code=exc.status_code,
             detail={

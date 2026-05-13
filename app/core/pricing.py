@@ -47,13 +47,24 @@ MODEL_PRICING: dict[str, ModelPricing] = {
 }
 
 
+def resolve_pricing_model(model: str) -> str:
+    if model in MODEL_PRICING:
+        return model
+
+    for candidate in sorted(MODEL_PRICING, key=len, reverse=True):
+        if model.startswith(f"{candidate}-"):
+            return candidate
+
+    return "mock-fast-small"
+
+
 def calculate_cost_usd(
     model: str,
     input_tokens: int,
     output_tokens: int,
     cached_input_tokens: int = 0,
 ) -> float:
-    pricing = MODEL_PRICING.get(model, MODEL_PRICING["mock-fast-small"])
+    pricing = MODEL_PRICING[resolve_pricing_model(model)]
     non_cached_input_tokens = max(input_tokens - cached_input_tokens, 0)
 
     total = (

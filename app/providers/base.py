@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
+from app.core.errors import GatewayError
+
 
 @dataclass(slots=True)
 class ProviderRequest:
@@ -24,7 +26,7 @@ class ProviderResponse:
     refusal: str | None = None
 
 
-class ProviderError(Exception):
+class ProviderError(GatewayError):
     def __init__(
         self,
         message: str,
@@ -32,9 +34,7 @@ class ProviderError(Exception):
         error_type: str,
         status_code: int = 502,
     ) -> None:
-        super().__init__(message)
-        self.error_type = error_type
-        self.status_code = status_code
+        super().__init__(message, error_type=error_type, status_code=status_code)
 
 
 class LLMProvider(ABC):

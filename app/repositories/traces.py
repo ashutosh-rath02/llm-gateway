@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import case, func, select
@@ -20,6 +21,20 @@ from app.schemas.trace import (
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True, slots=True)
+class PersistedModelCall:
+    attempt: int
+    provider: str
+    model: str
+    status: str
+    error_type: str | None
+    input_tokens: int
+    output_tokens: int
+    cached_input_tokens: int
+    latency_ms: int
+    cost_usd: float
+
+
 class TraceRepository:
     def record_success(
         self,
@@ -29,12 +44,17 @@ class TraceRepository:
         provider_name: str,
         response: GatewayExecuteResponse,
         latency_ms: int,
+        model_calls: list[PersistedModelCall],
+        gateway_metadata: dict | None = None,
     ) -> None:
         settings = get_settings()
         if not settings.trace_persistence_enabled:
             return
 
-        metadata, tenant_id, user_id_hash = self._sanitize_metadata(payload.metadata)
+        metadata, tenant_id, user_id_hash = self._sanitize_metadata(
+            payload.metadata,
+            gateway_metadata=gateway_metadata,
+        )
         usage = response.usage
 
         trace_record = TraceRecord(
@@ -64,20 +84,23 @@ class TraceRepository:
             fallback_used=response.fallback.used,
             fallback_level=response.fallback.level,
         )
-        call_record = ModelCallRecord(
-            trace_id=trace_id,
-            attempt=1,
-            provider=provider_name,
-            model=response.model,
-            status=response.status,
-            error_type=None,
-            input_tokens=usage.input_tokens if usage else 0,
-            output_tokens=usage.output_tokens if usage else 0,
-            cached_input_tokens=usage.cached_input_tokens if usage else 0,
-            latency_ms=latency_ms,
-            cost_usd=usage.cost_usd if usage else 0.0,
-        )
-        self._persist(trace_record, call_record)
+        call_records = [
+            ModelCallRecord(
+                trace_id=trace_id,
+                attempt=call.attempt,
+                provider=call.provider,
+                model=call.model,
+                status=call.status,
+                error_type=call.error_type,
+                input_tokens=call.input_tokens,
+                output_tokens=call.output_tokens,
+                cached_input_tokens=call.cached_input_tokens,
+                latency_ms=call.latency_ms,
+                cost_usd=call.cost_usd,
+            )
+            for call in model_calls
+        ]
+        self._persist(trace_record, call_records)
 
     def record_failure(
         self,
@@ -88,12 +111,19 @@ class TraceRepository:
         model_name: str | None,
         error_type: str,
         latency_ms: int,
+        model_calls: list[PersistedModelCall],
+        total_cost_usd: float = 0.0,
+        fallback_level: int = 0,
+        gateway_metadata: dict | None = None,
     ) -> None:
         settings = get_settings()
         if not settings.trace_persistence_enabled:
             return
 
-        metadata, tenant_id, user_id_hash = self._sanitize_metadata(payload.metadata)
+        metadata, tenant_id, user_id_hash = self._sanitize_metadata(
+            payload.metadata,
+            gateway_metadata=gateway_metadata,
+        )
 
         trace_record = TraceRecord(
             trace_id=trace_id,
@@ -114,33 +144,36 @@ class TraceRepository:
             output_tokens=0,
             cached_input_tokens=0,
             latency_ms=latency_ms,
-            cost_usd=0.0,
+            cost_usd=total_cost_usd,
             schema_valid=None,
             business_rules_valid=None,
-            fallback_used=False,
-            fallback_level=0,
+            fallback_used=fallback_level > 0,
+            fallback_level=fallback_level,
         )
-        call_record = ModelCallRecord(
-            trace_id=trace_id,
-            attempt=1,
-            provider=provider_name,
-            model=model_name or "unknown",
-            status="provider_error",
-            error_type=error_type,
-            input_tokens=0,
-            output_tokens=0,
-            cached_input_tokens=0,
-            latency_ms=latency_ms,
-            cost_usd=0.0,
-        )
-        self._persist(trace_record, call_record)
+        call_records = [
+            ModelCallRecord(
+                trace_id=trace_id,
+                attempt=call.attempt,
+                provider=call.provider,
+                model=call.model,
+                status=call.status,
+                error_type=call.error_type,
+                input_tokens=call.input_tokens,
+                output_tokens=call.output_tokens,
+                cached_input_tokens=call.cached_input_tokens,
+                latency_ms=call.latency_ms,
+                cost_usd=call.cost_usd,
+            )
+            for call in model_calls
+        ]
+        self._persist(trace_record, call_records)
 
-    def _persist(self, trace_record: TraceRecord, call_record: ModelCallRecord) -> None:
+    def _persist(self, trace_record: TraceRecord, call_records: list[ModelCallRecord]) -> None:
         try:
             with session_scope() as session:
                 session.add(trace_record)
                 session.flush()
-                session.add(call_record)
+                session.add_all(call_records)
         except SQLAlchemyError:
             logger.exception("Trace persistence failed for trace_id=%s", trace_record.trace_id)
 
@@ -239,6 +272,8 @@ class TraceRepository:
     def _sanitize_metadata(
         self,
         metadata: dict[str, Any],
+        *,
+        gateway_metadata: dict | None = None,
     ) -> tuple[dict[str, Any], str | None, str | None]:
         settings = get_settings()
         sanitized = dict(metadata)
@@ -250,6 +285,9 @@ class TraceRepository:
             user_id_hash = self._hash_identifier(str(raw_user_id))
             if not settings.hash_user_ids:
                 sanitized["user_id"] = raw_user_id
+
+        if gateway_metadata:
+            sanitized["_gateway"] = gateway_metadata
 
         return sanitized, tenant_id, user_id_hash
 
