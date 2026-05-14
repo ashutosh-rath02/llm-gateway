@@ -496,6 +496,24 @@ Internal documentation needs layers:
 - publishable change history
 - internal theory and lessons
 
+### Lesson 7
+
+A usable internal platform needs access boundaries, not just good core logic.
+
+It is not enough for the gateway to route, validate, and trace requests correctly.
+If multiple teams will use it, the system also needs a clean caller identity model and predictable data boundaries.
+
+What this means in practice:
+
+- the caller must be identifiable
+- tenant ownership must be enforced centrally
+- trace and metrics visibility cannot be assumed to be universal
+- feature access may need to be constrained per caller
+
+The learning:
+
+Adoption readiness starts when platform rules move out of team-specific code and into the shared gateway itself.
+
 ## 7. How To Read The Current System Conceptually
 
 The current system can be understood as four stacked layers:
@@ -503,6 +521,8 @@ The current system can be understood as four stacked layers:
 ### Layer 1: Access Layer
 
 Unified request interface for product features.
+
+This layer now also includes caller identity and tenant scoping, because access policy is part of the gateway contract, not just an outer API concern.
 
 ### Layer 2: Decision Layer
 
@@ -526,6 +546,8 @@ This fourth layer is what turns the gateway from a utility into a strategic plat
 - At what point should prompt metadata become a full prompt registry?
 - When do evals become mandatory for changes?
 - What should be stored by default versus redacted by default?
+- Which endpoints should be tenant-visible versus admin-only by default?
+- How far should feature allowlists go before we need richer role policy?
 - Where should feature-specific business validators live?
 - When is fine-tuning a better solution than prompt/routing complexity?
 

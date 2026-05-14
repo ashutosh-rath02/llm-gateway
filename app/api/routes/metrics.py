@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.api.security import AuthContext, get_auth_context, resolve_tenant_scope
 from app.repositories.traces import TraceRepository
 from app.schemas.trace import CostMetricsResponse, ReliabilityMetricsResponse
 
@@ -14,11 +15,13 @@ def get_cost_metrics(
     tenant_id: str | None = Query(default=None),
     prompt_template_name: str | None = Query(default=None),
     prompt_template_version: str | None = Query(default=None),
+    auth: AuthContext = Depends(get_auth_context),
 ) -> CostMetricsResponse:
+    scoped_tenant_id = resolve_tenant_scope(tenant_id, auth)
     return trace_repository.get_cost_metrics(
         feature=feature,
         model=model,
-        tenant_id=tenant_id,
+        tenant_id=scoped_tenant_id,
         prompt_template_name=prompt_template_name,
         prompt_template_version=prompt_template_version,
     )
@@ -31,11 +34,13 @@ def get_reliability_metrics(
     tenant_id: str | None = Query(default=None),
     prompt_template_name: str | None = Query(default=None),
     prompt_template_version: str | None = Query(default=None),
+    auth: AuthContext = Depends(get_auth_context),
 ) -> ReliabilityMetricsResponse:
+    scoped_tenant_id = resolve_tenant_scope(tenant_id, auth)
     return trace_repository.get_reliability_metrics(
         feature=feature,
         model=model,
-        tenant_id=tenant_id,
+        tenant_id=scoped_tenant_id,
         prompt_template_name=prompt_template_name,
         prompt_template_version=prompt_template_version,
     )

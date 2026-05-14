@@ -1,6 +1,15 @@
 from functools import lru_cache
+from typing import Literal
 
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class AuthKeySettings(BaseModel):
+    name: str
+    role: Literal["admin", "tenant"] = "tenant"
+    tenant_id: str | None = None
+    allowed_features: list[str] = Field(default_factory=list)
 
 
 class Settings(BaseSettings):
@@ -22,6 +31,8 @@ class Settings(BaseSettings):
     store_outputs: bool = False
     hash_user_ids: bool = True
     trace_persistence_enabled: bool = True
+    auth_enabled: bool = False
+    auth_api_keys: dict[str, AuthKeySettings] = Field(default_factory=dict)
 
     model_config = SettingsConfigDict(
         env_file=".env",

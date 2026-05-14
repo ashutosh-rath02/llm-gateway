@@ -13,6 +13,8 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path: pytest.TempPathFactory) ->
     monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{database_file.as_posix()}")
     monkeypatch.setenv("DEFAULT_PROVIDER", "mock")
     monkeypatch.setenv("TRACE_PERSISTENCE_ENABLED", "true")
+    monkeypatch.setenv("AUTH_ENABLED", "false")
+    monkeypatch.setenv("AUTH_API_KEYS", "{}")
 
     get_settings.cache_clear()
     reset_db_caches()

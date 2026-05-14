@@ -4,6 +4,8 @@
 
 ### Added
 
+- Optional API-key authentication with tenant-scoped access control for execute, trace, metrics, and eval endpoints
+- Feature allowlists for API keys so gateway access can be constrained per caller integration
 - OpenAI-compatible provider implementation using the Responses API
 - Optional request-level provider override for testing `mock` and `openai_compatible`
 - Rule-based model routing for `cost_optimized`, `balanced`, `quality_optimized`, and explicit model selection
@@ -21,6 +23,7 @@
 
 ### Changed
 
+- README and `.env.example` now document copy-paste-safe auth configuration for local testing
 - Cost calculation now uses model-specific pricing metadata for known models
 - Trace model-call records now label attempts as `primary`, `repair`, or `fallback`
 - Cost metrics filters now also support prompt template name/version, and README flowcharts now cover reliability rollups

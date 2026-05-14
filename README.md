@@ -10,6 +10,7 @@ This repository currently includes:
 
 - FastAPI service scaffold
 - request trace middleware
+- optional API-key authentication with tenant-scoped access control
 - health endpoint
 - `POST /v1/llm/execute` endpoint with mock and OpenAI-compatible provider paths
 - rule-based routing for `cost_optimized`, `balanced`, `quality_optimized`, and explicit model selection
@@ -44,6 +45,54 @@ To exercise the live OpenAI path:
 1. Set `OPENAI_API_KEY` in `.env`.
 2. Either set `DEFAULT_PROVIDER=openai_compatible` or send `"provider": "openai_compatible"` in the request body.
 3. Optionally set `OPENAI_DEFAULT_MODEL` to the model you want to use.
+
+## Authentication and Tenant Access
+
+Auth is optional in local development and can be enabled with:
+
+- `AUTH_ENABLED=true`
+- `AUTH_API_KEYS=<json>`
+
+`AUTH_API_KEYS` is a JSON object keyed by API key value. Each key can declare:
+
+- `name`
+- `role`: `admin` or `tenant`
+- `tenant_id`: required for tenant keys
+- `allowed_features`: optional allowlist for execute requests
+
+Example:
+
+```json
+{
+  "tenant-demo-key": {
+    "name": "support-app",
+    "role": "tenant",
+    "tenant_id": "tenant_123",
+    "allowed_features": ["support_triage"]
+  },
+  "admin-demo-key": {
+    "name": "platform-admin",
+    "role": "admin"
+  }
+}
+```
+
+For `.env`, keep the JSON on a single line:
+
+```text
+AUTH_API_KEYS={"tenant-key":{"name":"tenant-app","role":"tenant","tenant_id":"tenant_123"},"admin-key":{"name":"admin-app","role":"admin"},"feature-key":{"name":"feature-app","role":"tenant","tenant_id":"tenant_123","allowed_features":["support_triage"]}}
+```
+
+Send the key as either:
+
+- `Authorization: Bearer <key>`
+- `X-API-Key: <key>`
+
+When auth is enabled:
+
+- tenant callers are automatically scoped to their own `tenant_id`
+- trace lookup returns `404` outside the caller's tenant boundary
+- metrics and eval exports are automatically filtered to the caller's tenant unless the key is admin
 
 ## Routing and Fallback
 
