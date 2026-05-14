@@ -116,6 +116,33 @@ Current behavior:
 
 The current limiter is process-local and intended as a safe default for early shared usage. If we later run multiple gateway instances, this should move to a shared store such as Redis.
 
+## Trace Storage and Redaction
+
+Trace persistence now supports basic storage governance controls:
+
+- `STORE_PROMPTS`
+- `STORE_OUTPUTS`
+- `PROMPT_STORAGE_FEATURE_DENYLIST`
+- `OUTPUT_STORAGE_FEATURE_DENYLIST`
+- `TRACE_REDACT_METADATA_KEYS`
+
+Current behavior:
+
+- prompts and outputs can still be disabled globally
+- specific features can be denied prompt/output preview storage even when global storage is enabled
+- sensitive metadata keys are redacted recursively before persistence
+- `user_id` continues to be hashed into `user_id_hash` instead of being stored directly by default
+
+Example metadata keys redacted by default:
+
+- `password`
+- `token`
+- `secret`
+- `authorization`
+- `api_key`
+- `access_token`
+- `refresh_token`
+
 ## Routing and Fallback
 
 Current routing policies:

@@ -34,6 +34,19 @@ class Settings(BaseSettings):
     max_request_cost_budget_usd: float = 2.0
     store_prompts: bool = False
     store_outputs: bool = False
+    prompt_storage_feature_denylist: list[str] = Field(default_factory=list)
+    output_storage_feature_denylist: list[str] = Field(default_factory=list)
+    trace_redact_metadata_keys: list[str] = Field(
+        default_factory=lambda: [
+            "password",
+            "token",
+            "secret",
+            "authorization",
+            "api_key",
+            "access_token",
+            "refresh_token",
+        ]
+    )
     hash_user_ids: bool = True
     trace_persistence_enabled: bool = True
     auth_enabled: bool = False

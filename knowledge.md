@@ -531,6 +531,24 @@ The learning:
 
 Multi-team adoption is partly about fairness. Good platform behavior is not only "can this request succeed?" but also "can every caller share the system safely?"
 
+### Lesson 9
+
+Trace storage is a product policy decision, not just an implementation detail.
+
+Once a gateway is shared, persisted traces stop being purely technical artifacts.
+They become records that may contain user text, model outputs, tenant metadata, and integration context.
+
+That means storage policy needs explicit controls for:
+
+- whether prompts are stored at all
+- whether outputs are stored at all
+- which features are never allowed to persist previews
+- which metadata keys must always be redacted before persistence
+
+The learning:
+
+Observability is only valuable when it is governable. A good trace system should make storage intentional, not accidental.
+
 ## 7. How To Read The Current System Conceptually
 
 The current system can be understood as four stacked layers:

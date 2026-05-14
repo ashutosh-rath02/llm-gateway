@@ -28,6 +28,7 @@ from app.schemas.trace import (
 )
 
 logger = logging.getLogger(__name__)
+REDACTED_VALUE = "[redacted]"
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,8 +115,12 @@ class TraceRepository:
             tenant_id=tenant_id,
             user_id_hash=user_id_hash,
             request_metadata=metadata,
-            input_preview=self._maybe_input_preview(settings, payload.input),
-            output_preview=self._maybe_output_preview(settings, response.output),
+            input_preview=self._maybe_input_preview(settings, payload.feature, payload.input),
+            output_preview=self._maybe_output_preview(
+                settings,
+                payload.feature,
+                response.output,
+            ),
             input_tokens=usage.input_tokens if usage else 0,
             output_tokens=usage.output_tokens if usage else 0,
             cached_input_tokens=usage.cached_input_tokens if usage else 0,
@@ -168,7 +173,7 @@ class TraceRepository:
             tenant_id=tenant_id,
             user_id_hash=user_id_hash,
             request_metadata=metadata,
-            input_preview=self._maybe_input_preview(settings, payload.input),
+            input_preview=self._maybe_input_preview(settings, payload.feature, payload.input),
             output_preview=None,
             input_tokens=0,
             output_tokens=0,
@@ -448,7 +453,10 @@ class TraceRepository:
         gateway_metadata: dict | None = None,
     ) -> tuple[dict[str, Any], str | None, str | None]:
         settings = get_settings()
-        sanitized = dict(metadata)
+        sanitized = self._redact_sensitive_metadata(
+            dict(metadata),
+            settings.trace_redact_metadata_keys,
+        )
         tenant_id = sanitized.get("tenant_id")
         raw_user_id = sanitized.pop("user_id", None)
         user_id_hash = None
@@ -463,13 +471,17 @@ class TraceRepository:
 
         return sanitized, tenant_id, user_id_hash
 
-    def _maybe_input_preview(self, settings, prompt: str) -> str | None:
+    def _maybe_input_preview(self, settings, feature: str, prompt: str) -> str | None:
         if not settings.store_prompts:
+            return None
+        if feature in settings.prompt_storage_feature_denylist:
             return None
         return prompt
 
-    def _maybe_output_preview(self, settings, output: object) -> str | None:
+    def _maybe_output_preview(self, settings, feature: str, output: object) -> str | None:
         if not settings.store_outputs:
+            return None
+        if feature in settings.output_storage_feature_denylist:
             return None
 
         if isinstance(output, str):
@@ -482,6 +494,27 @@ class TraceRepository:
 
     def _hash_identifier(self, raw_value: str) -> str:
         return hashlib.sha256(raw_value.encode("utf-8")).hexdigest()
+
+    def _redact_sensitive_metadata(
+        self,
+        value: Any,
+        sensitive_keys: list[str],
+    ) -> Any:
+        sensitive_key_set = {item.lower() for item in sensitive_keys}
+
+        if isinstance(value, dict):
+            redacted: dict[str, Any] = {}
+            for key, item in value.items():
+                if str(key).lower() in sensitive_key_set:
+                    redacted[key] = REDACTED_VALUE
+                else:
+                    redacted[key] = self._redact_sensitive_metadata(item, sensitive_keys)
+            return redacted
+
+        if isinstance(value, list):
+            return [self._redact_sensitive_metadata(item, sensitive_keys) for item in value]
+
+        return value
 
     def _group_cost_breakdown(
         self,
