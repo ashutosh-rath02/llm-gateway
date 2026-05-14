@@ -17,6 +17,7 @@ def authenticated_client(
     monkeypatch.setenv("DEFAULT_PROVIDER", "mock")
     monkeypatch.setenv("TRACE_PERSISTENCE_ENABLED", "true")
     monkeypatch.setenv("AUTH_ENABLED", "true")
+    monkeypatch.setenv("EXECUTE_RATE_LIMIT_ENABLED", "false")
     monkeypatch.setenv(
         "AUTH_API_KEYS",
         (

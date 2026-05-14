@@ -94,6 +94,28 @@ When auth is enabled:
 - trace lookup returns `404` outside the caller's tenant boundary
 - metrics and eval exports are automatically filtered to the caller's tenant unless the key is admin
 
+## Execution Guardrails
+
+The gateway now applies two safety controls to `POST /v1/llm/execute`:
+
+- request budget caps, so callers cannot ask for arbitrarily high latency or cost envelopes
+- in-memory rate limiting, so one caller cannot flood the shared gateway by default
+
+Config:
+
+- `EXECUTE_RATE_LIMIT_ENABLED`
+- `EXECUTE_RATE_LIMIT_REQUESTS`
+- `EXECUTE_RATE_LIMIT_WINDOW_SECONDS`
+- `MAX_REQUEST_LATENCY_BUDGET_MS`
+- `MAX_REQUEST_COST_BUDGET_USD`
+
+Current behavior:
+
+- requests over the configured latency or cost caps return `400`
+- callers over the execute rate limit return `429`
+
+The current limiter is process-local and intended as a safe default for early shared usage. If we later run multiple gateway instances, this should move to a shared store such as Redis.
+
 ## Routing and Fallback
 
 Current routing policies:

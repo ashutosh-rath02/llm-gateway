@@ -514,6 +514,23 @@ The learning:
 
 Adoption readiness starts when platform rules move out of team-specific code and into the shared gateway itself.
 
+### Lesson 8
+
+Shared platform safety needs demand control as well as access control.
+
+Even authenticated callers can overload a gateway or request unrealistic execution envelopes if there are no guardrails.
+
+That means platform readiness also includes:
+
+- rate limits
+- bounded latency expectations
+- bounded cost expectations
+- predictable rejection behavior when limits are exceeded
+
+The learning:
+
+Multi-team adoption is partly about fairness. Good platform behavior is not only "can this request succeed?" but also "can every caller share the system safely?"
+
 ## 7. How To Read The Current System Conceptually
 
 The current system can be understood as four stacked layers:

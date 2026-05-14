@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     repair_retry_enabled: bool = True
     max_repair_attempts_per_model: int = 1
     repair_prompt_version: str = "repair_v1"
+    execute_rate_limit_enabled: bool = True
+    execute_rate_limit_requests: int = 60
+    execute_rate_limit_window_seconds: int = 60
+    max_request_latency_budget_ms: int = 30_000
+    max_request_cost_budget_usd: float = 2.0
     store_prompts: bool = False
     store_outputs: bool = False
     hash_user_ids: bool = True
