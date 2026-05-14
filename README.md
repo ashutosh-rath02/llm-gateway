@@ -9,6 +9,7 @@ We keep the changelog and the flowcharts in this README updated as the system ev
 This repository currently includes:
 
 - FastAPI service scaffold
+- lightweight internal dashboard at `GET /dashboard`
 - request trace middleware
 - optional API-key authentication with tenant-scoped access control
 - health endpoint
@@ -142,6 +143,26 @@ Example metadata keys redacted by default:
 - `api_key`
 - `access_token`
 - `refresh_token`
+
+## Internal Dashboard
+
+`GET /dashboard` serves a lightweight internal UI for operators and integrators.
+
+It is intentionally thin:
+
+- no frontend build step
+- no separate data layer
+- uses the existing gateway APIs for cost, reliability, eval export, and trace detail
+
+Current dashboard features:
+
+- API key entry stored in browser session storage
+- cost and reliability overview cards
+- feature-level cost and reliability tables
+- recent trace list powered by eval export
+- direct trace lookup and pretty-printed trace detail
+
+The dashboard shell itself is just an internal page. Data access still goes through the protected gateway APIs using the same `X-API-Key` / bearer-token auth model as other callers.
 
 ## Routing and Fallback
 
@@ -284,6 +305,7 @@ flowchart TD
 ## API Endpoints
 
 - `GET /healthz`
+- `GET /dashboard`
 - `GET /v1/meta`
 - `POST /v1/llm/execute`
 - `GET /v1/traces/{trace_id}`

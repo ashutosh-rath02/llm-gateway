@@ -549,6 +549,21 @@ The learning:
 
 Observability is only valuable when it is governable. A good trace system should make storage intentional, not accidental.
 
+### Lesson 10
+
+A dashboard should be a lens over the gateway, not a second system beside it.
+
+When the dashboard reuses the same protected APIs that outside callers use, a few good things happen:
+
+- the UI stays aligned with real system behavior
+- access control stays centralized
+- trace and metrics semantics do not diverge between API users and UI users
+- we avoid creating a hidden admin-only backend with different rules
+
+The learning:
+
+For an early internal platform, a thin dashboard is often better than a deep one. The value is legibility, not architectural duplication.
+
 ## 7. How To Read The Current System Conceptually
 
 The current system can be understood as four stacked layers:
