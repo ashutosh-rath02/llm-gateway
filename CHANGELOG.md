@@ -16,12 +16,15 @@
 - Prompt template name/version tracking on execute requests and persisted traces
 - Same-model repair retry for structured-output validation failures
 - Reliability metrics endpoint at `GET /v1/metrics/reliability`
+- Eval export endpoint at `POST /v1/evals/export`
+- Lightweight eval CLI for exporting, summarizing, and comparing JSONL datasets
 
 ### Changed
 
 - Cost calculation now uses model-specific pricing metadata for known models
 - Trace model-call records now label attempts as `primary`, `repair`, or `fallback`
 - Cost metrics filters now also support prompt template name/version, and README flowcharts now cover reliability rollups
+- README flowcharts now cover eval export, and trace filters are reusable across metrics and export paths
 - Test setup now uses an isolated SQLite database so persistence is exercised in CI-friendly runs
 - README now includes living Mermaid flowcharts for request execution, repair, trace persistence, and reliability metrics
 - The bundled Postgres dev port now defaults to `5433` to avoid collisions with local Postgres services

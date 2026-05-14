@@ -18,6 +18,7 @@ This repository currently includes:
 - `GET /v1/traces/{trace_id}` endpoint for trace inspection
 - `GET /v1/metrics/cost` endpoint for cost rollups
 - `GET /v1/metrics/reliability` endpoint for success, failure, repair, and fallback rollups
+- `POST /v1/evals/export` endpoint for turning traces into reusable eval datasets
 - configuration system
 - trace persistence models and Alembic migration
 - Docker Compose for Postgres
@@ -79,6 +80,23 @@ Those values are persisted on the top-level trace so you can tie outcomes, cost,
 - repair recovery rate
 - average attempts per request
 - breakdowns by feature, model, tenant, and prompt template version
+
+## Eval Export
+
+`POST /v1/evals/export` lets us turn persisted traces into eval-ready dataset items.
+
+Current export supports filtering by:
+
+- feature
+- task type
+- model
+- status
+- tenant
+- fallback used
+- prompt template name
+- prompt template version
+
+The export response includes normalized request/response fields, prompt metadata, usage, fallback summary, and per-attempt model-call history.
 
 ## Flowcharts
 
@@ -153,6 +171,18 @@ flowchart TD
     F --> G[Serve GET /v1/metrics/reliability]
 ```
 
+### Eval Export Flow
+
+```mermaid
+flowchart TD
+    A[Persisted traces and model calls] --> B[Apply export filters]
+    B --> C[Load matching trace history]
+    C --> D[Normalize each trace into dataset item]
+    D --> E[Include prompt metadata and attempt history]
+    E --> F[Return POST /v1/evals/export]
+    F --> G[Optional JSONL file for offline evals]
+```
+
 ## API Endpoints
 
 - `GET /healthz`
@@ -161,3 +191,4 @@ flowchart TD
 - `GET /v1/traces/{trace_id}`
 - `GET /v1/metrics/cost`
 - `GET /v1/metrics/reliability`
+- `POST /v1/evals/export`

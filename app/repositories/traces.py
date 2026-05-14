@@ -11,6 +11,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import get_settings
 from app.db.session import session_scope
 from app.models.trace import ModelCallRecord, TraceRecord
+from app.schemas.evals import (
+    EvalDatasetAttempt,
+    EvalDatasetItem,
+    EvalExportRequest,
+    EvalExportResponse,
+)
 from app.schemas.llm import GatewayExecuteRequest, GatewayExecuteResponse
 from app.schemas.trace import (
     CostBreakdownItem,
@@ -369,6 +375,72 @@ class TraceRepository:
             ),
         )
 
+    def export_eval_dataset(self, payload: EvalExportRequest) -> EvalExportResponse:
+        with session_scope() as session:
+            filters = self._build_trace_filters(
+                feature=payload.feature,
+                task_type=payload.task_type,
+                model=payload.model,
+                status=payload.status,
+                tenant_id=payload.tenant_id,
+                fallback_used=payload.fallback_used,
+                prompt_template_name=payload.prompt_template_name,
+                prompt_template_version=payload.prompt_template_version,
+            )
+            traces = session.scalars(
+                self._build_trace_query(filters)
+                .order_by(TraceRecord.created_at.desc())
+                .limit(payload.limit)
+            ).all()
+            model_calls_by_trace = self._load_model_calls_by_trace(session, traces)
+
+        items = [
+            EvalDatasetItem(
+                trace_id=trace.trace_id,
+                created_at=trace.created_at,
+                feature=trace.feature,
+                task_type=trace.task_type,
+                provider=trace.provider,
+                model=trace.model,
+                status=trace.status,
+                input=trace.input_preview,
+                output=self._deserialize_output_preview(trace.output_preview),
+                expected=None,
+                prompt_template_name=trace.prompt_template_name,
+                prompt_template_version=trace.prompt_template_version,
+                tenant_id=trace.tenant_id,
+                user_id_hash=trace.user_id_hash,
+                request_metadata=trace.request_metadata,
+                schema_valid=trace.schema_valid,
+                business_rules_valid=trace.business_rules_valid,
+                fallback=self._build_fallback_summary(trace),
+                usage=self._build_usage_summary(trace),
+                latency_ms=trace.latency_ms,
+                cost_usd=trace.cost_usd,
+                model_calls=[
+                    EvalDatasetAttempt(
+                        attempt=call.attempt,
+                        attempt_kind=call.attempt_kind,
+                        provider=call.provider,
+                        model=call.model,
+                        status=call.status,
+                        error_type=call.error_type,
+                        usage=self._build_usage_summary(call),
+                        latency_ms=call.latency_ms,
+                        created_at=call.created_at,
+                    )
+                    for call in model_calls_by_trace.get(trace.trace_id, [])
+                ],
+            )
+            for trace in traces
+        ]
+
+        return EvalExportResponse(
+            item_count=len(items),
+            filters=payload.model_dump(exclude_none=True),
+            items=items,
+        )
+
     def _sanitize_metadata(
         self,
         metadata: dict[str, Any],
@@ -453,18 +525,27 @@ class TraceRepository:
         self,
         *,
         feature: str | None,
+        task_type: str | None = None,
         model: str | None,
+        status: str | None = None,
         tenant_id: str | None,
+        fallback_used: bool | None = None,
         prompt_template_name: str | None,
         prompt_template_version: str | None,
     ) -> list:
         filters = []
         if feature is not None:
             filters.append(TraceRecord.feature == feature)
+        if task_type is not None:
+            filters.append(TraceRecord.task_type == task_type)
         if model is not None:
             filters.append(TraceRecord.model == model)
+        if status is not None:
+            filters.append(TraceRecord.status == status)
         if tenant_id is not None:
             filters.append(TraceRecord.tenant_id == tenant_id)
+        if fallback_used is not None:
+            filters.append(TraceRecord.fallback_used == fallback_used)
         if prompt_template_name is not None:
             filters.append(TraceRecord.prompt_template_name == prompt_template_name)
         if prompt_template_version is not None:
@@ -575,6 +656,15 @@ class TraceRepository:
         if version:
             return version
         return "unknown"
+
+    def _deserialize_output_preview(self, output_preview: str | None) -> object | None:
+        if output_preview is None:
+            return None
+
+        try:
+            return json.loads(output_preview)
+        except (TypeError, ValueError):
+            return output_preview
 
     def _rate(self, numerator: int, denominator: int) -> float:
         if denominator == 0:
